@@ -137,8 +137,8 @@ class Manifold:
         cos_phis = minimum(maximum(cos_phis, tensor(-1., dtype=self.dtype)), tensor(1., dtype=self.dtype))
         phis = arccos(cos_phis)
 
-        signed_ls = (us * cross(Ns, twin_Ns, dim=-1)).sum(dim=-1)
-
+        crosses = cross(Ns, twin_Ns, dim=-1)
+        signed_ls = (us * crosses / norm(crosses, dim=-1, keepdims=True)).sum(dim=-1)
         Hs_by_halfedge = signed_ls * phis / 2
         Hs = self.tail_vertices_to_halfedges.T @ Hs_by_halfedge / 2
         return Hs
