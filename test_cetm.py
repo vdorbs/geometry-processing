@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from geometry_processing import Manifold, PuncturedToplogicalSphere
+from geometry_processing import Manifold, PuncturedTopologicalSphere
 from matplotlib.pyplot import figure, show
 from potpourri3d import read_mesh
 from torch import tensor
@@ -14,7 +14,7 @@ vertices = tensor(vertices)
 faces = tensor(faces)
 
 sphere = Manifold(faces, dtype=vertices.dtype)
-disk = PuncturedToplogicalSphere(sphere)
+disk = PuncturedTopologicalSphere(sphere)
 fs = vertices[1:]
 ls = disk.halfedge_vectors_to_metric(disk.embedding_to_halfedge_vectors(fs))
 _, flat_ls = disk.metric_to_flat_metric(ls, num_iters=50, verbose=True)

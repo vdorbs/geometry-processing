@@ -5,7 +5,7 @@ from torchsparsegradutils.cupy import sparse_solve_c4t
 from typing import Tuple
 
 
-class PuncturedToplogicalSphere(Manifold):
+class PuncturedTopologicalSphere(Manifold):
     def __init__(self, sphere: Manifold):
         faces = sphere.faces[(sphere.faces != 0).all(dim=-1)] - 1
         Manifold.__init__(self, faces, dtype=sphere.dtype)

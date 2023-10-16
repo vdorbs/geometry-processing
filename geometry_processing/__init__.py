@@ -1,3 +1,3 @@
 from .manifold import Manifold
-from .punctured_topological_sphere import PuncturedToplogicalSphere
+from .punctured_topological_sphere import PuncturedTopologicalSphere
 from .quaternionic_manifold import QuaternionicManifold
