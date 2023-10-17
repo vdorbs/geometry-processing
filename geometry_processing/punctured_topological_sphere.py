@@ -1,5 +1,5 @@
 from geometry_processing.manifold import Manifold
-from torch import arange, cat, exp, eye, log, ones, pi, randn, sort, sparse_coo_tensor, sqrt, stack, Tensor, unique, zeros
+from torch import arange, cat, exp, eye, log, ones, pi, randn, sort, sparse_coo_tensor, sqrt, stack, Tensor, unique, zeros, zeros_like
 from torch.linalg import norm
 from torchsparsegradutils.cupy import sparse_solve_c4t
 from typing import Tuple
@@ -33,6 +33,14 @@ class PuncturedTopologicalSphere(Manifold):
         values = 1j * cat([-ones(len(self.boundary_pair_idxs), dtype=self.dtype), ones(len(self.boundary_pair_idxs), dtype=self.dtype)]) / 4
         idxs = cat([self.boundary_pair_idxs.T, self.boundary_pair_idxs.flip(1).T], dim=-1)
         self.A = sparse_coo_tensor(idxs, values, (self.num_vertices, self.num_vertices))
+
+    def embedding_to_boundary_normalization(self, fs: Tensor, removed_fs: Tensor) -> Tensor:
+        boundary_fs = fs[..., self.boundary_vertices, :]
+        ls = norm(boundary_fs - removed_fs.unsqueeze(-2), dim=-1)
+
+        us = zeros_like(fs[..., 0])
+        us[..., self.boundary_vertices] = 2 * log(ls.mean(dim=-1, keepdims=True) / ls)
+        return us
 
     def metric_to_boundary_mass_matrix(self, ls: Tensor):
         boundary_halfedge_lengths = ls[self.boundary_halfedges]

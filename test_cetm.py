@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from geometry_processing import Manifold, PuncturedTopologicalSphere
 from matplotlib.pyplot import figure, show
 from potpourri3d import read_mesh
-from torch import tensor
+from torch import exp, tensor
 
 
 parser = ArgumentParser()
@@ -17,6 +17,11 @@ sphere = Manifold(faces, dtype=vertices.dtype)
 disk = PuncturedTopologicalSphere(sphere)
 fs = vertices[1:]
 ls = disk.halfedge_vectors_to_metric(disk.embedding_to_halfedge_vectors(fs))
+
+# Boundary normalization
+us = disk.embedding_to_boundary_normalization(fs, vertices[0])
+ls = exp((disk.tail_vertices_to_halfedges @ us + disk.tip_vertices_to_halfedges @ us) / 2) * ls
+
 _, flat_ls = disk.metric_to_flat_metric(ls, num_iters=50, verbose=True)
 flat_fs = disk.metric_to_spectral_conformal_parametrization_fiedler(flat_ls, num_iters=20, verbose=True)
 
