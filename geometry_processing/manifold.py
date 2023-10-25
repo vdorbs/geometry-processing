@@ -105,6 +105,39 @@ class Manifold:
     def embedding_to_halfedge_vectors(self, fs: Tensor) -> Tensor:
         return self.signed_vertices_to_halfedges @ fs
 
+    def embedding_to_angles(self, fs: Tensor) -> Tensor:
+        return self.halfedge_vectors_to_angles(self.embedding_to_halfedge_vectors(fs))
+
+    def embedding_to_angle_sums(self, fs: Tensor) -> Tensor:
+        return self.angles_to_angle_sums(self.embedding_to_angles(fs))
+
+    def embedding_to_areas(self, fs: Tensor) -> Tensor:
+        return self.halfedge_vectors_to_areas(self.embedding_to_halfedge_vectors(fs))
+
+    def embedding_to_face_normals(self, fs: Tensor, keep_scale: bool = False) -> Tensor:
+        return self.halfedge_vectors_to_face_normals(self.embedding_to_halfedge_vectors(fs), keep_scale)
+
+    def embedding_to_metric(self, fs: Tensor) -> Tensor:
+        return self.halfedge_vectors_to_metric(self.embedding_to_halfedge_vectors(fs))
+
+    def embedding_to_poisson(self, fs: Tensor, using_diag_mass: bool = False):
+        us = self.embedding_to_halfedge_vectors(fs)
+        L = self.angles_to_laplacian(self.halfedge_vectors_to_angles(us))
+
+        As = self.halfedge_vectors_to_areas(us)
+        if using_diag_mass:
+            M = self.areas_to_diag_mass_matrix(As)
+        else:
+            M = self.areas_to_mass_matrix(As)
+
+        return L, M
+
+    def embedding_to_vertex_areas(self, fs: Tensor) -> Tensor:
+        return self.areas_to_vertex_areas(self.embedding_to_areas(fs))
+
+    def embedding_to_vertex_mean_curvatures(self, fs: Tensor) -> Tensor:
+        return self.halfedge_vectors_to_vertex_mean_curvatures(self.embedding_to_halfedge_vectors(fs))
+
     def halfedge_vectors_to_angles(self, us: Tensor) -> Tensor:
         u_jks = us[..., self.jk_idxs, :]
         u_kis = us[..., self.ki_idxs, :]
@@ -183,3 +216,14 @@ class Manifold:
         s_ijks = (l_ijs + l_jks + l_kis) / 2
 
         return sqrt(s_ijks * (s_ijks - l_ijs) * (s_ijks - l_jks) * (s_ijks - l_kis))
+
+    def metric_to_poisson(self, ls: Tensor, using_diag_mass: bool = False):
+        L = self.angles_to_laplacian(self.metric_to_angles(ls))
+
+        As = self.metric_to_areas(ls)
+        if using_diag_mass:
+            M = self.areas_to_diag_mass_matrix(As)
+        else:
+            M = self.areas_to_mass_matrix(As)
+
+        return L, M
