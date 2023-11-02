@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
-from geometry_processing import Manifold, PuncturedTopologicalSphere
-from matplotlib.pyplot import figure, show
+from geometry_processing import Manifold
+from geometry_processing.utils import embedding_to_spherical_parametrization
+from matplotlib.pyplot import show, subplots
 from potpourri3d import read_mesh
 from torch import exp, tensor
 
@@ -14,27 +15,19 @@ vertices = tensor(vertices)
 faces = tensor(faces)
 
 sphere = Manifold(faces, dtype=vertices.dtype)
-disk = PuncturedTopologicalSphere(sphere)
-fs = vertices[1:]
-ls = disk.halfedge_vectors_to_metric(disk.embedding_to_halfedge_vectors(fs))
+fs = vertices
+sphere_fs, log_factors = embedding_to_spherical_parametrization(sphere, fs, flatten_num_iters=50, layout_num_iters=20, verbose=True)
 
-# Boundary normalization
-us = disk.embedding_to_boundary_normalization(fs, vertices[0])
-ls = exp((disk.tail_vertices_to_halfedges @ us + disk.tip_vertices_to_halfedges @ us) / 2) * ls
+init_metric = sphere.embedding_to_metric(fs)
+final_metric = sphere.embedding_to_metric(sphere_fs)
+discrete_conformal_err = final_metric - exp(sphere.signed_vertices_to_halfedges.abs() @ log_factors / 2) * init_metric
+print(discrete_conformal_err.abs().max().item())
 
-_, flat_ls = disk.metric_to_flat_metric(ls, num_iters=50, verbose=True)
-flat_fs = disk.metric_to_spectral_conformal_parametrization_fiedler(flat_ls, num_iters=20, verbose=True)
-
-fig = figure(figsize=(8, 4), tight_layout=True)
-
-ax = fig.add_subplot(1, 2, 1, projection='3d')
-ax.plot_trisurf(*vertices.T, triangles=faces)
-ax.view_init(azim=45)
-ax.set_box_aspect((1, 1, 1))
-ax.axis('off')
-
-ax = fig.add_subplot(1, 2, 2)
-ax.triplot(*flat_fs.T, triangles=disk.faces, linewidth=0.1)
-ax.axis('equal')
+_, axs = subplots(1, 2, figsize=(8, 4), tight_layout=True, subplot_kw=dict(projection='3d'))
+for ax, data in zip(axs, [fs, sphere_fs]):
+    ax.plot_trisurf(*data.T, triangles=faces, linewidth=0.1, edgecolor='w')
+    ax.view_init(azim=45)
+    ax.set_box_aspect((1, 1, 1))
+    ax.axis('off')
 
 show()

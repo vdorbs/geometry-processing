@@ -1,6 +1,8 @@
-from torch import arange, arccos, argsort, cat, cos, diff, eye, float32, IntTensor, maximum, minimum, ones, pi, sin, sort, sparse_coo_tensor, sqrt, stack, Tensor, tensor, zeros_like
-from torch.linalg import cross, norm
+from torch import arange, arccos, argsort, cat, cos, diag, diff, eye, float32, IntTensor, maximum, minimum, ones, pi, randn, sin, sort, sparse_coo_tensor, sqrt, stack, Tensor, tensor, zeros_like
+from torch.linalg import cross, norm, qr
 from torch.sparse import spdiags
+from torchsparsegradutils.cupy import sparse_solve_c4t
+from typing import Tuple
 
 
 class Manifold:
@@ -132,6 +134,20 @@ class Manifold:
 
         return L, M
 
+    def embedding_and_vertex_values_to_face_grads(self, fs: Tensor, phis: Tensor) -> Tensor:
+        us = self.embedding_to_halfedge_vectors(fs)
+        Ns = self.halfedge_vectors_to_face_normals(us, keep_scale=True)
+        As = norm(Ns, dim=-1)
+
+        Ns = Ns.repeat_interleave(3, dim=-2)
+        As = As.repeat_interleave(3, dim=-1).unsqueeze(-1)
+        basis_grads = cross(Ns, us) / (2 * As)
+        basis_grads = basis_grads[self.jk_idxs]
+        basis_grads = basis_grads.unflatten(-2, (self.num_faces, 3))
+        grad_phis = (phis[self.faces].unsqueeze(-1) * basis_grads).sum(dim=-2)
+
+        return grad_phis
+
     def embedding_to_vertex_areas(self, fs: Tensor) -> Tensor:
         return self.areas_to_vertex_areas(self.embedding_to_areas(fs))
 
@@ -175,6 +191,30 @@ class Manifold:
         Hs_by_halfedge = signed_ls * phis / 2
         Hs = self.tail_vertices_to_halfedges.T @ Hs_by_halfedge / 2
         return Hs
+
+    def laplacian_and_vertex_areas_to_eigs(self, L, vertex_As: Tensor, num_eigs: int, num_iters: int, verbose: bool = False, eps: float = 0) -> Tuple[Tensor, Tensor]:
+        A = -L + eps * spdiags(ones(self.num_vertices, dtype=self.dtype), tensor(0), shape=(self.num_vertices, self.num_vertices))
+        vertex_As = vertex_As.unsqueeze(-1)
+        sqrt_vertex_As = sqrt(vertex_As)
+
+        eigvecs = randn(self.num_vertices, num_eigs, dtype=self.dtype)
+        for iteration in range(num_iters):
+            new_eigvecs = sparse_solve_c4t(A, vertex_As * eigvecs)
+            lin_solve_err = norm(A @ new_eigvecs - vertex_As * eigvecs)
+            eigvecs = new_eigvecs
+
+            eigvecs = qr(sqrt_vertex_As * eigvecs).Q / sqrt_vertex_As
+            grammian = eigvecs.T @ (vertex_As * eigvecs)
+            grammian_err = norm(grammian - eye(num_eigs, dtype=self.dtype))
+
+            eigvals = diag((A @ eigvecs).T @ eigvecs)
+            residuals = A @ eigvecs - eigvals.unsqueeze(-2) * (vertex_As * eigvecs)
+            residual_errs = norm(residuals, dim=-2)
+
+            if verbose:
+                print(iteration, lin_solve_err.item(), grammian_err.item(), residual_errs)
+
+        return eigvals, eigvecs
 
     def metric_to_angles(self, ls: Tensor, keep_safe: bool = True) -> Tensor:
         # Compute angles with law of cosines
