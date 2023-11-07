@@ -155,13 +155,13 @@ class Manifold:
         return self.halfedge_vectors_to_vertex_mean_curvatures(self.embedding_to_halfedge_vectors(fs))
 
     def embeddings_to_rotation(self, fs: Tensor, target_fs: Tensor) -> Tensor:
-        fs -= fs.mean(dim=-2, keepdims=True)
-        target_fs -= target_fs.mean(dim=-2, keepdims=True)
+        X = fs - fs.mean(dim=-2, keepdims=True)
+        Y = target_fs - target_fs.mean(dim=-2, keepdims=True)
 
-        fs /= sqrt(self.embedding_to_areas(fs).sum())
-        target_fs /= sqrt(self.embedding_to_areas(target_fs).sum())
+        X /= sqrt(self.embedding_to_areas(X).sum())
+        Y /= sqrt(self.embedding_to_areas(Y).sum())
 
-        U, _, V_T = svd(target_fs.T @ fs)
+        U, _, V_T = svd(Y.T @ X)
         R = U @ V_T
 
         return R
