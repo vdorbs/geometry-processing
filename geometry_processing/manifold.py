@@ -1,5 +1,5 @@
 from torch import arange, arccos, argsort, cat, cos, diag, diff, eye, float32, IntTensor, maximum, minimum, ones, pi, randn, sin, sort, sparse_coo_tensor, sqrt, stack, Tensor, tensor, zeros_like
-from torch.linalg import cross, norm, qr
+from torch.linalg import cross, norm, qr, svd
 from torch.sparse import spdiags
 from torchsparsegradutils.cupy import sparse_solve_c4t
 from typing import Tuple
@@ -153,6 +153,18 @@ class Manifold:
 
     def embedding_to_vertex_mean_curvatures(self, fs: Tensor) -> Tensor:
         return self.halfedge_vectors_to_vertex_mean_curvatures(self.embedding_to_halfedge_vectors(fs))
+
+    def embeddings_to_rotation(self, fs: Tensor, target_fs: Tensor) -> Tensor:
+        fs -= fs.mean(dim=-2, keepdims=True)
+        target_fs -= target_fs.mean(dim=-2, keepdims=True)
+
+        fs /= sqrt(self.embedding_to_areas(fs).sum())
+        target_fs /= sqrt(self.embedding_to_areas(target_fs).sum())
+
+        U, _, V_T = svd(target_fs.T @ fs)
+        R = U @ V_T
+
+        return R
 
     def halfedge_vectors_to_angles(self, us: Tensor) -> Tensor:
         u_jks = us[..., self.jk_idxs, :]
