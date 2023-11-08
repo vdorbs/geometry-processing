@@ -1,6 +1,6 @@
 from geometry_processing import Manifold, PuncturedTopologicalSphere
-from torch import arange, cat, exp, IntTensor, log, Tensor, tensor, zeros
-from torch.linalg import cross, norm
+from torch import arange, cat, exp, eye, inf, IntTensor, log, Tensor, tensor, zeros, zeros_like
+from torch.linalg import cross, norm, solve
 from typing import Tuple
 
 
@@ -40,6 +40,50 @@ def embedding_to_spherical_parametrization(m: Manifold, fs: Tensor, flatten_num_
 
     return sphere_fs, log_factors
 
+def mobius_center(m: Manifold, sphere_fs: Tensor, original_As: Tensor, num_iters: int, verbose: bool = False, max_divisions: int = 50) -> Tuple[Tensor, Tensor]:
+    sphere_fs = sphere_fs.clone()
+    original_As = original_As.clone()
+    original_As = (original_As / original_As.sum(dim=-1, keepdims=True)).unsqueeze(-1)
+
+    face_centers = sphere_fs[m.faces].mean(dim=-2)
+    face_centers /= norm(face_centers, dim=-1, keepdims=True)
+
+    com = (original_As * face_centers).sum(dim=-2)
+    log_factors = zeros_like(sphere_fs[..., 0])
+    for iteration in range(num_iters):
+        jac = 2 * (original_As.unsqueeze(-1) * (eye(3) - face_centers.unsqueeze(-1) * face_centers.unsqueeze(-2))).sum(dim=-3)
+        inv_center = -solve(jac, com)
+
+        while norm(inv_center, dim=-1).max() > 1.:
+            inv_center /= 2
+
+        inv_center = inv_center.unsqueeze(-2)
+        com_norm = norm(com, dim=-1)
+        new_com_norm = inf
+
+        inv_center *= 2
+        divisions = 0
+        while new_com_norm > com_norm and divisions < max_divisions:
+            inv_center /= 2
+            divisions += 1
+            new_sphere_fs = sphere_fs + inv_center
+            new_sphere_fs /= (norm(new_sphere_fs, dim=-1, keepdims=True) ** 2)
+            new_sphere_fs = (1 - (norm(inv_center, dim=-1, keepdims=True) ** 2)) * new_sphere_fs + inv_center
+            new_face_centers = new_sphere_fs[m.faces].mean(dim=-2)
+            new_face_centers /= norm(new_face_centers, dim=-1, keepdims=True)
+            new_com = (original_As * new_face_centers).sum(dim=-2)
+            new_com_norm = norm(new_com)
+
+        log_factors += log((1 - norm(inv_center, dim=-1) ** 2) / (norm(sphere_fs + inv_center, dim=-1) ** 2))
+
+        sphere_fs = new_sphere_fs
+        face_centers = new_face_centers
+        com = new_com
+
+        if verbose:
+            print(iteration, com)
+
+    return sphere_fs, log_factors
 
 def sphere_embedding_to_locator(m: Manifold, sphere_fs: Tensor):
     hyperplane_normals = cross(m.tail_vertices_to_halfedges @ sphere_fs, m.tip_vertices_to_halfedges @ sphere_fs)
