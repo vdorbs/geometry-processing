@@ -154,14 +154,18 @@ class Manifold:
     def embedding_to_vertex_mean_curvatures(self, fs: Tensor) -> Tensor:
         return self.halfedge_vectors_to_vertex_mean_curvatures(self.embedding_to_halfedge_vectors(fs))
 
-    def embeddings_to_rotation(self, fs: Tensor, target_fs: Tensor) -> Tensor:
-        X = fs - fs.mean(dim=-2, keepdims=True)
-        Y = target_fs - target_fs.mean(dim=-2, keepdims=True)
+    def embeddings_to_rotation(self, fs: Tensor, target_fs: Tensor, center_and_normalize: bool = False) -> Tensor:
+        if center_and_normalize:
+            face_centers = fs[self.faces].mean(dim=-2)
+            target_face_centers = target_fs[self.faces].mean(dim=-2)
 
-        X /= sqrt(self.embedding_to_areas(X).sum())
-        Y /= sqrt(self.embedding_to_areas(Y).sum())
+            As = self.embedding_to_areas(fs).unsqueeze(-1)
+            target_As = self.embedding_to_areas(target_fs).unsqueeze(-1)
 
-        U, _, V_T = svd(Y.T @ X)
+            fs = (fs - (As * face_centers).sum(dim=-2, keepdims=True)) / sqrt(As.sum(dim=-2, keepdims=True))
+            target_fs = (target_fs - (target_As * target_face_centers).sum(dim=-2, keepdims=True)) / sqrt(target_As.sum(dim=-2, keepdims=True))
+
+        U, _, V_T = svd(target_fs.T @ fs)
         R = U @ V_T
 
         return R

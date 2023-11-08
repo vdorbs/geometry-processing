@@ -16,7 +16,7 @@ m = Manifold(tensor(faces), dtype=fs.dtype)
 
 sphere_fs_1, _ = embedding_to_spherical_parametrization(m, fs, flatten_num_iters=50, layout_num_iters=20)
 sphere_fs_2, _ = embedding_to_spherical_parametrization(m, fs, flatten_num_iters=50, layout_num_iters=20)
-R = m.embeddings_to_rotation(sphere_fs_1, sphere_fs_2)
+R = m.embeddings_to_rotation(sphere_fs_1, sphere_fs_2, center_and_normalize=True)
 
 _, axs = subplots(2, 2, figsize=(8, 8), tight_layout=True, subplot_kw=dict(projection='3d'))
 for ax, data in zip(axs.flatten(), [sphere_fs_1, sphere_fs_2, (R @ sphere_fs_1.T).T, sphere_fs_2]):
@@ -27,7 +27,7 @@ for ax, data in zip(axs.flatten(), [sphere_fs_1, sphere_fs_2, (R @ sphere_fs_1.T
 
 show()
 
-R = m.embeddings_to_rotation(sphere_fs_1, fs)
+R = m.embeddings_to_rotation(sphere_fs_1, fs, center_and_normalize=True)
 
 _, axs = subplots(2, 2, figsize=(8, 8), tight_layout=True, subplot_kw=dict(projection='3d'))
 for ax, data in zip(axs.flatten(), [fs, sphere_fs_1, fs, (R @ sphere_fs_1.T).T]):
