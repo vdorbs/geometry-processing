@@ -1,5 +1,5 @@
 from torch import arange, arccos, argsort, cat, cos, diag, diff, eye, float32, IntTensor, maximum, minimum, ones, pi, randn, sin, sort, sparse_coo_tensor, sqrt, stack, Tensor, tensor, zeros_like
-from torch.linalg import cross, norm, qr, svd
+from torch.linalg import cross, det, norm, qr, svd
 from torch.sparse import spdiags
 from torchsparsegradutils.cupy import sparse_solve_c4t
 from typing import Tuple
@@ -166,6 +166,10 @@ class Manifold:
             target_fs = (target_fs - (target_As * target_face_centers).sum(dim=-2, keepdims=True)) / sqrt(target_As.sum(dim=-2, keepdims=True))
 
         U, _, V_T = svd(target_fs.T @ fs)
+        R = U @ V_T
+
+        # Correct for reflections
+        V_T[..., -1, :] *= det(R)
         R = U @ V_T
 
         return R
